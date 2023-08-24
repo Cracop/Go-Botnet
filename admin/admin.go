@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"os"
@@ -16,9 +18,23 @@ var (
 	conn      net.Conn
 )
 
+func hashMessage(message string) string {
+	// Create a new SHA-256 hash object
+	hash := sha256.New()
+	// Write the input data to the hash object
+	hash.Write([]byte(message))
+	// Get the resulting hash as a byte slice
+	hashBytes := hash.Sum(nil)
+	// Convert the hash to a hexadecimal string
+	hashString := hex.EncodeToString(hashBytes)
+
+	return hashString
+}
+
 func sendMessage() {
 	for {
 		message := <-broadcast
+		message = hashMessage(message)
 		_, err := conn.Write([]byte(message)) //Sends message to clients
 		if err != nil {
 			fmt.Println("Error broadcasting data:", err)
@@ -72,8 +88,17 @@ func main() {
 				time.Sleep(time.Second) // Wait before attempting to reconnect
 				continue
 			}
+
 			fmt.Println("Connected to the server")
 			conn = newConn
+			defer conn.Close()
+
+			// Send client type identifier to the server
+			_, err = conn.Write([]byte("bot"))
+			if err != nil {
+				fmt.Println("Error sending:", err)
+				return
+			}
 		}
 		fmt.Print("GoBot> ")
 		reader := bufio.NewReader(os.Stdin)

